@@ -2219,8 +2219,12 @@ async function uploadToSheets(entry) {
 
     // Upload receipt as tiny thumbnail via GET (fits in URL, no CORS issues)
     const base64 = entry.receiptBase64 || entry.invoiceBase64 || null;
+    console.log('RECEIPT DEBUG - base64 present:', !!base64, 'length:', base64 ? base64.length : 0, 'id:', entry.id);
     if (base64 && entry.id) {
+      console.log('RECEIPT DEBUG - calling uploadReceiptGet');
       uploadReceiptGet(base, entry.id, entry.type, base64);
+    } else {
+      console.log('RECEIPT DEBUG - no base64 found, skipping receipt upload');
     }
     toast('Saved to Google Sheets ✓', 'success');
 
