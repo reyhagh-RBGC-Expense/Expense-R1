@@ -1,87 +1,39 @@
 <!DOCTYPE html>
 <html>
-<head><title>Sheets + Receipt Test</title></head>
+<head><title>Test</title></head>
 <body style="font-family:sans-serif;padding:20px">
-<h2>Apps Script Connection Test</h2>
-<button onclick="testWrite()">Send Test Expense</button>
-<button onclick="testRead()">Read Sheet</button>
-<button onclick="testReceipt()">Test Receipt Upload</button>
-<input type="file" id="photo" accept="image/*">
-<pre id="out" style="background:#eee;padding:10px;margin-top:10px;white-space:pre-wrap"></pre>
+<h2>Connection Test</h2>
+<button onclick="testWrite()">1. Send Test Expense</button>
+<button onclick="testRead()">2. Read Sheet</button>
+<button onclick="testReceipt()">3. Test Receipt Link</button>
+<pre id="out" style="background:#eee;padding:10px;margin-top:10px;white-space:pre-wrap;word-break:break-all"></pre>
 <script>
-const URL = 'https://script.google.com/macros/s/AKfycbyWvU61_vWDk6bkTtEHNPpohjTkp-O4wkC7ogGxSlBQ9NxbtCT0s8lV13y28ajMunQZ/exec';
-const TEST_ID = 'receipt_test_' + Date.now();
+const URL = 'https://script.google.com/a/macros/rbgcconstruction.com/s/AKfycbyWvU61_vWDk6bkTtEHNPpohjTkp-O4wkC7ogGxSlBQ9NxbtCT0s8lV13y28ajMunQZ/exec';
+const ID = 'test_' + Date.now();
+function log(m){document.getElementById('out').textContent+=m+'\n';}
+function ping(url){return new Promise(r=>{const s=document.createElement('script');s.src=url+'&_cb='+Date.now();s.onload=()=>{s.remove();r('✅ loaded');};s.onerror=()=>{s.remove();r('⚠️ onerror (may still work)');};document.head.appendChild(s);setTimeout(()=>{try{s.remove();}catch(e){}r('⏱ timeout');},8000);});}
 
-function log(msg) { document.getElementById('out').textContent += msg + '\n'; }
-
-function ping(url) {
-  return new Promise((resolve) => {
-    const s = document.createElement('script');
-    s.src = url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
-    s.onload = () => { s.remove(); resolve('loaded'); };
-    s.onerror = () => { s.remove(); resolve('error(still ok)'); };
-    document.head.appendChild(s);
-    setTimeout(() => { try{s.remove();}catch(e){} resolve('timeout'); }, 10000);
-  });
+function testWrite(){
+  log('Sending expense ID: '+ID);
+  const p=new URLSearchParams({action:'add',type:'expense',date:'2026-07-05',vendor:'LINKTEST',desc:'Testing receipt link',category:'Advertising',amount:1,currency:'USD',method:'Cash',taxDeductible:'No',receiptUrl:'https://drive.google.com/test-link',id:ID});
+  ping(URL+'?'+p).then(r=>log('Write: '+r+' — check sheet!'));
 }
 
-function testWrite() {
-  log('Sending test expense...');
-  const params = new URLSearchParams({action:'add',type:'expense',date:'2026-07-04',vendor:'RECEIPTTEST',desc:'TestWithReceipt',category:'Advertising',amount:1,currency:'USD',method:'Cash',taxDeductible:'No',id:TEST_ID});
-  ping(URL + '?' + params).then(r => log('Write ping: ' + r + ' — check sheet!'));
+async function testRead(){
+  log('Reading...');
+  try{
+    const r=await fetch(URL+'?action=read&type=expense',{mode:'cors'});
+    const d=await r.json();
+    log('Rows: '+d.rows.length);
+    const last=d.rows.slice(-2);
+    log(JSON.stringify(last,null,2));
+  }catch(e){log('❌ '+e.message);}
 }
 
-async function testRead() {
-  log('Reading sheet...');
-  try {
-    const r = await fetch(URL + '?action=read&type=expense', {mode:'cors'});
-    const d = await r.json();
-    log('Read OK — rows: ' + d.rows.length);
-    const last = d.rows[d.rows.length-1];
-    log('Last row: ' + JSON.stringify(last, null, 2));
-  } catch(e) { log('Read failed: ' + e.message); }
-}
-
-async function testReceipt() {
-  const file = document.getElementById('photo').files[0];
-  if (!file) { log('Please select a photo first!'); return; }
-  log('Reading photo...');
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const base64 = e.target.result;
-    const raw = base64.split(',')[1];
-    log('Photo size: ' + Math.round(raw.length/1024) + 'KB raw base64');
-
-    // Compress
-    const img = new Image();
-    img.onload = async () => {
-      const canvas = document.createElement('canvas');
-      const scale = Math.min(1, 300/img.width);
-      canvas.width = Math.round(img.width*scale);
-      canvas.height = Math.round(img.height*scale);
-      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-      const compressed = canvas.toDataURL('image/jpeg', 0.4);
-      const compRaw = compressed.split(',')[1];
-      log('Compressed size: ' + Math.round(compRaw.length/1024) + 'KB');
-
-      const CHUNK = 3000;
-      const chunks = [];
-      for (let i=0; i<compRaw.length; i+=CHUNK) chunks.push(compRaw.slice(i,i+CHUNK));
-      log('Chunks to send: ' + chunks.length);
-
-      for (let i=0; i<chunks.length; i++) {
-        const params = new URLSearchParams({action:'receiptChunk',id:TEST_ID,type:'expense',mime:'image/jpeg',chunk:i,total:chunks.length,data:chunks[i]});
-        const r = await ping(URL + '?' + params);
-        log('Chunk ' + i + '/' + chunks.length + ': ' + r);
-      }
-      const doneParams = new URLSearchParams({action:'receiptDone',id:TEST_ID,type:'expense'});
-      const dr = await ping(URL + '?' + doneParams);
-      log('Done ping: ' + dr);
-      log('Now click Read Sheet to see if receiptUrl is filled in!');
-    };
-    img.src = base64;
-  };
-  reader.readAsDataURL(file);
+function testReceipt(){
+  log('Testing updateReceipt for ID: '+ID);
+  const p=new URLSearchParams({action:'updateReceipt',type:'expense',id:ID,url:'https://drive.google.com/RECEIPT-TEST-LINK-123'});
+  ping(URL+'?'+p).then(r=>log('Receipt update: '+r+' — check col 13 in sheet!'));
 }
 </script>
 </body>
