@@ -1640,7 +1640,7 @@ const STATE = {
   settings: {
     lang: 'en',
     currency: 'USD',
-    sheetsUrl: 'https://script.google.com/a/macros/rbgcconstruction.com/s/AKfycbyWvU61_vWDk6bkTtEHNPpohjTkp-O4wkC7ogGxSlBQ9NxbtCT0s8lV13y28ajMunQZ/exec',
+    sheetsUrl: 'https://script.google.com/macros/s/AKfycbwCZtyNMYYcwUFHhaew40VSL9ssbBawrTw4aWlVZTTWUyp88gewj_Ct_FK8obA-y57XjQ/exec',
     onboardingDone: false,
     licensed: false,
     trialStart: null,
@@ -1680,7 +1680,7 @@ function load() {
     if (i) STATE.income = JSON.parse(i);
     if (s) STATE.settings = { ...STATE.settings, ...JSON.parse(s) };
     // Always force the correct Apps Script URL regardless of what localStorage has
-    const CORRECT_URL = 'https://script.google.com/a/macros/rbgcconstruction.com/s/AKfycbyWvU61_vWDk6bkTtEHNPpohjTkp-O4wkC7ogGxSlBQ9NxbtCT0s8lV13y28ajMunQZ/exec';
+    const CORRECT_URL = 'https://script.google.com/macros/s/AKfycbwCZtyNMYYcwUFHhaew40VSL9ssbBawrTw4aWlVZTTWUyp88gewj_Ct_FK8obA-y57XjQ/exec';
     STATE.settings.sheetsUrl = CORRECT_URL;
   } catch(e) { console.warn('Load failed:', e); }
 }
