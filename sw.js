@@ -1,4 +1,4 @@
-// Service worker disabled - no caching
+// Service worker disabled - no caching, always fresh
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
   e.waitUntil(
