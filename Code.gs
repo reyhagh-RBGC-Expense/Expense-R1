@@ -59,6 +59,24 @@ function doGet(e) {
     const type   = (p.type   || 'expense').toLowerCase();
     const ss     = SpreadsheetApp.getActiveSpreadsheet();
 
+    // ── DRIVE TEST (diagnostic) ─────────────────────────────────────────────
+    // Visit  <execUrl>?action=driveTest  in a browser. It returns readable JSON.
+    //   {"status":"ok","test":"drive-ok", ...}  → Drive auth is fine (URL length is the culprit)
+    //   {"status":"error","message":"DRIVE TEST FAILED: ...permission..."} → re-authorize Drive
+    if (action === 'drivetest') {
+      try {
+        const folder = getOrCreateFolder(RECEIPTS_FOLDER);
+        const blob   = Utilities.newBlob('Ledger Pro Drive test — ' + new Date(),
+                                          'text/plain', 'ledgerpro_drivetest.txt');
+        const file   = folder.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        return ok({ test: 'drive-ok', folderName: folder.getName(),
+                    folderId: folder.getId(), fileUrl: file.getUrl() });
+      } catch (ex) {
+        return err('DRIVE TEST FAILED: ' + (ex && ex.message ? ex.message : ex));
+      }
+    }
+
     // ── ADD ────────────────────────────────────────────────────────────────
     if (action === 'add') {
       if (type === 'expense') {
@@ -89,7 +107,12 @@ function doGet(e) {
                 var file = folder.createFile(blob);
                 file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
                 return file.getUrl();
-              } catch(ex) { return ''; }
+              } catch(ex) {
+                // Was: silently returned '' — which hid every failure.
+                // Now: log it (see Executions) AND leave a breadcrumb in the cell.
+                console.error('receipt upload failed: ' + (ex && ex.message ? ex.message : ex));
+                return 'UPLOAD FAILED: ' + (ex && ex.message ? ex.message : ex);
+              }
             }
             return u;
           })(),    // receipt/drive link
