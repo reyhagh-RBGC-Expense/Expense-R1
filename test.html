@@ -8,7 +8,7 @@
 <button onclick="testReceipt()">3. Test Receipt Link</button>
 <pre id="out" style="background:#eee;padding:10px;margin-top:10px;white-space:pre-wrap;word-break:break-all"></pre>
 <script>
-const URL = 'https://script.google.com/macros/s/AKfycbwCZtyNMYYcwUFHhaew40VSL9ssbBawrTw4aWlVZTTWUyp88gewj_Ct_FK8obA-y57XjQ/exec';
+const URL = 'https://script.google.com/macros/s/AKfycbxNE2F7f_zpuJJE8aFXdRF5lLXvLaueVbeP4z1AjuO_93Dnjmt0NbUmbvHbVNxxOun9hA/exec';
 const ID = 'test_' + Date.now();
 function log(m){document.getElementById('out').textContent+=m+'\n';}
 function ping(url){return new Promise(r=>{const s=document.createElement('script');s.src=url+'&_cb='+Date.now();s.onload=()=>{s.remove();r('✅ loaded');};s.onerror=()=>{s.remove();r('⚠️ onerror (may still work)');};document.head.appendChild(s);setTimeout(()=>{try{s.remove();}catch(e){}r('⏱ timeout');},8000);});}
