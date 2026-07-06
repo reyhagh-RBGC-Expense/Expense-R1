@@ -2238,11 +2238,11 @@ async function uploadAttachmentChunked(entry) {
     if (/^data:application\/pdf/i.test(src)) {
       dataUrl = src; mime = 'application/pdf';                          // PDFs sent as-is
     } else {
-      dataUrl = await compressImage(src, 1500, 0.72); mime = 'image/jpeg'; // readable, not a thumbnail
+      dataUrl = await compressImage(src, 1300, 0.7); mime = 'image/jpeg'; // readable, not a thumbnail
     }
     const b64   = dataUrl.split(',')[1] || '';
     const safe  = b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-    const CHUNK = 6000;
+    const CHUNK = 7000;
     const total = Math.ceil(safe.length / CHUNK);
     const sendChunk = (i) => pingSheets(buildUrl(base, {
       action: 'attachChunk', id: entry.id, chunk: i, data: safe.slice(i * CHUNK, (i + 1) * CHUNK)
@@ -2252,9 +2252,11 @@ async function uploadAttachmentChunked(entry) {
     const doneUrl  = buildUrl(base, { action: 'attachDone', id: entry.id, total: total, mime: mime, atype: entry.type });
     const finalize = () => fetch(doneUrl, { method: 'GET', mode: 'cors' }).then(r => r.json()).catch(() => null);
     let res = await finalize();
-    if (res && res.status === 'error' && Array.isArray(res.missing) && res.missing.length) {
-      for (const i of res.missing) await sendChunk(i);   // resend only the dropped pieces
+    let rounds = 0;
+    while (res && res.status === 'error' && Array.isArray(res.missing) && res.missing.length && rounds < 4) {
+      for (const i of res.missing) await sendChunk(i);   // resend only the dropped pieces, repeat until clean
       res = await finalize();
+      rounds++;
     }
     if (res && res.status === 'ok' && res.url) toast('Attachment uploaded \u2713', 'success');
     else toast('Attachment didn\'t attach' + (res && res.message ? ': ' + res.message : ''), 'info');
