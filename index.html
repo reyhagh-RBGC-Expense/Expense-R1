@@ -1703,15 +1703,12 @@ function trialDaysLeft() {
 
 function isLicensed() { return STATE.settings.licensed; }
 function isTrialActive() { return trialDaysLeft() > 0; }
-function hasAccess() { return isLicensed() || isTrialActive(); }
+function hasAccess() { return true; }  // upgrade + trial removed
 
 function updateTrialBanner() {
-  const banner = document.getElementById('trial-banner');
-  if (isLicensed()) { banner.classList.add('hidden'); return; }
-  const days = trialDaysLeft();
-  if (days <= 0) { banner.classList.add('hidden'); return; }
-  banner.classList.remove('hidden');
-  document.getElementById('trial-days-left').textContent = days;
+  // Upgrade/trial removed — always hide the trial banner and the Settings upgrade row.
+  var b = document.getElementById('trial-banner'); if (b) b.classList.add('hidden');
+  var s = document.getElementById('settings-upgrade-btn'); if (s) s.style.display = 'none';
 }
 
 // Play Billing bridge (Android WebView)
@@ -2231,7 +2228,7 @@ async function uploadToSheets(entry) {
 }
 
 // Send a readable-quality receipt/invoice to Drive by splitting it into URL-safe base64
-// chunks. Avoids the single-request URL-length limit that used to force 80px thumbnails.
+// chunks. Verifies delivery and resends any dropped piece, so the Drive link reliably lands.
 async function uploadAttachmentChunked(entry) {
   const base = STATE.settings.sheetsUrl;
   const src  = entry.type === 'income' ? entry.invoiceBase64 : entry.receiptBase64;
@@ -2239,22 +2236,29 @@ async function uploadAttachmentChunked(entry) {
   try {
     let dataUrl, mime;
     if (/^data:application\/pdf/i.test(src)) {
-      dataUrl = src; mime = 'application/pdf';                         // PDFs sent as-is
+      dataUrl = src; mime = 'application/pdf';                          // PDFs sent as-is
     } else {
-      dataUrl = await compressImage(src, 1000, 0.6); mime = 'image/jpeg'; // readable, not a thumbnail
+      dataUrl = await compressImage(src, 1500, 0.72); mime = 'image/jpeg'; // readable, not a thumbnail
     }
     const b64   = dataUrl.split(',')[1] || '';
     const safe  = b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     const CHUNK = 6000;
     const total = Math.ceil(safe.length / CHUNK);
-    for (let i = 0; i < total; i++) {
-      await pingSheets(buildUrl(base, {
-        action: 'attachChunk', id: entry.id, chunk: i, total: total,
-        mime: mime, atype: entry.type, data: safe.slice(i * CHUNK, (i + 1) * CHUNK)
-      }));
+    const sendChunk = (i) => pingSheets(buildUrl(base, {
+      action: 'attachChunk', id: entry.id, chunk: i, data: safe.slice(i * CHUNK, (i + 1) * CHUNK)
+    }));
+    for (let i = 0; i < total; i++) await sendChunk(i);
+    // Finalize with a readable (cors) request so we can confirm success and resend drops.
+    const doneUrl  = buildUrl(base, { action: 'attachDone', id: entry.id, total: total, mime: mime, atype: entry.type });
+    const finalize = () => fetch(doneUrl, { method: 'GET', mode: 'cors' }).then(r => r.json()).catch(() => null);
+    let res = await finalize();
+    if (res && res.status === 'error' && Array.isArray(res.missing) && res.missing.length) {
+      for (const i of res.missing) await sendChunk(i);   // resend only the dropped pieces
+      res = await finalize();
     }
-    await pingSheets(buildUrl(base, { action: 'attachDone', id: entry.id, atype: entry.type }));
-  } catch(e) { console.warn('attachment upload failed', e); }
+    if (res && res.status === 'ok' && res.url) toast('Attachment uploaded \u2713', 'success');
+    else toast('Attachment didn\'t attach' + (res && res.message ? ': ' + res.message : ''), 'info');
+  } catch(e) { console.warn('attachment upload failed', e); toast('Attachment error: ' + e.message, 'info'); }
 }
 
 // Upload receipt as tiny thumbnail via GET ping — fits in URL, follows Google redirects
