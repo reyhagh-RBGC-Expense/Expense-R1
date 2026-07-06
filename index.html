@@ -2238,7 +2238,7 @@ async function uploadAttachmentChunked(entry) {
     if (/^data:application\/pdf/i.test(src)) {
       dataUrl = src; mime = 'application/pdf';                          // PDFs sent as-is
     } else {
-      dataUrl = await compressImage(src, 1300, 0.7); mime = 'image/jpeg'; // readable, not a thumbnail
+      dataUrl = await compressImage(src, 1000, 0.6); mime = 'image/jpeg'; // readable, not a thumbnail
     }
     const b64   = dataUrl.split(',')[1] || '';
     const safe  = b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
