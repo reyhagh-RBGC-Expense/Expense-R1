@@ -2247,19 +2247,29 @@ async function uploadAttachmentChunked(entry) {
     const sendChunk = (i) => pingSheets(buildUrl(base, {
       action: 'attachChunk', id: entry.id, chunk: i, data: safe.slice(i * CHUNK, (i + 1) * CHUNK)
     }));
-    for (let i = 0; i < total; i++) await sendChunk(i);
-    // Finalize with a readable (cors) request so we can confirm success and resend drops.
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    for (let i = 0; i < total; i++) { await sendChunk(i); }
+    await sleep(1500); // let the final server-side writes settle before we assemble
     const doneUrl  = buildUrl(base, { action: 'attachDone', id: entry.id, total: total, mime: mime, atype: entry.type });
-    const finalize = () => fetch(doneUrl, { method: 'GET', mode: 'cors' }).then(r => r.json()).catch(() => null);
+    const finalize = () => fetch(doneUrl, { method: 'GET', mode: 'cors', cache: 'no-store' })
+      .then(r => r.json())
+      .catch(err => ({ status: 'error', message: 'finalize request failed: ' + (err && err.message ? err.message : err) }));
     let res = await finalize();
     let rounds = 0;
-    while (res && res.status === 'error' && Array.isArray(res.missing) && res.missing.length && rounds < 4) {
-      for (const i of res.missing) await sendChunk(i);   // resend only the dropped pieces, repeat until clean
+    while (res && res.status === 'error' && Array.isArray(res.missing) && res.missing.length && rounds < 8) {
+      for (const i of res.missing) { await sendChunk(i); } // resend only the dropped pieces
+      await sleep(800);
       res = await finalize();
       rounds++;
     }
-    if (res && res.status === 'ok' && res.url) toast('Attachment uploaded \u2713', 'success');
-    else toast('Attachment didn\'t attach' + (res && res.message ? ': ' + res.message : ''), 'info');
+    if (res && res.status === 'ok' && res.url) {
+      toast('Attachment uploaded \u2713', 'success');
+    } else {
+      const reason = (res && res.message) ? res.message : 'no response from the backend';
+      toast('Attachment didn\'t attach: ' + reason, 'info');
+      // Unmissable, so we finally see the exact reason instead of guessing:
+      try { alert('ATTACHMENT FAILED\n\n' + reason + '\n\nPlease screenshot this and send it.'); } catch(e) {}
+    }
   } catch(e) { console.warn('attachment upload failed', e); toast('Attachment error: ' + e.message, 'info'); }
 }
 
